@@ -1,7 +1,13 @@
+<img width="224" height="224" alt="image" src="https://github.com/user-attachments/assets/d315b380-0621-4960-bdd5-b416c3c21c53" />
+
+
 # Cap Writeup
-<br>
+
+### About Cap
+>Cap is an easy difficulty Linux machine running an HTTP server that performs administrative functions including performing >network captures. Improper controls result in Insecure Direct Object Reference (IDOR) giving access to another user's capture. >The capture contains plaintext credentials and can be used to gain foothold. A Linux capability is then leveraged to escalate >to root. 
 
 ## NMAP
+<br>
 
 ```bash
 nmap -sC -sV -p- cap.htb -oN cap_nmap
