@@ -13,4 +13,4 @@ Each box has its own folder containing:
 - `notes.md` → Optional rough notes or commands  
 
 ## Boxes
-- [Cap](/cap/readme.md)
+- [Cap](/cap/README.md)
