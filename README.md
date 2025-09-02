@@ -1,4 +1,4 @@
-# Writeups
+# HTB Writeups
 
 This repository contains my personal writeups and notes from Hack The Box (HTB) challenges.  
 I use these exercises to practice **enumeration, exploitation, privilege escalation, and detection thinking** — skills directly applicable to a SOC Analyst / Blue Team role.  
