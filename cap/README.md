@@ -87,7 +87,7 @@ Finished
 
 Checked out the redirect address http://cap.htb/data/13 which has a download button
 
-![image.png](/screenshots/image.png)
+![image.png](screenshots/image.png) 
 
 Downloaded the file seems to be a pcap file 0.pcap
 
@@ -95,7 +95,7 @@ Searching through the pcap file for any good information
 
 Able to find user credentials
 
-![image1.png](/screenshots/image1.png)
+![image1.png](screenshots/image1.png)
 
 Credentials found nathan:Buck3tH4TF0RM3!
 
