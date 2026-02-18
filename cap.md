@@ -1,5 +1,6 @@
 <img width="224" height="224" alt="image" src="https://github.com/user-attachments/assets/d315b380-0621-4960-bdd5-b416c3c21c53" />
 
+## HTB Writeup: Cap
 > Machine Information
 > 
 > Name: Cap
