@@ -1,12 +1,5 @@
 # 🟢 Hack The Box Writeups
 
-A collection of writeups from machines and challenges completed on 
-Hack The Box. Each writeup documents my methodology, tools used, and 
-key defensive takeaways — written with a blue team mindset to reinforce 
-SOC-relevant skills alongside the offensive techniques.
-
-## 📋 About This Repo
-
 These writeups are structured to go beyond just "how I got the flag" — 
 each one includes detection opportunities and defensive lessons learned, 
 reflecting the dual awareness required in SOC work. All machines are 
