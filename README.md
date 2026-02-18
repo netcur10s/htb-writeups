@@ -14,3 +14,4 @@ Each box has its own folder containing:
 
 ## Boxes
 - [Cap](/cap/README.md)
+- [Codepart2](/codepart2/README.md)
