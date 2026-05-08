@@ -20,6 +20,8 @@ capability on the Python binary allows trivial privilege escalation to root.
 **Attack Chain:** IDOR → PCAP Analysis → FTP Credential Extraction → SSH Reuse → 
 Linux Capabilities (cap_setuid)
 
+---
+
 ## Enumeration
 
 ### Nmap
@@ -61,6 +63,8 @@ Results:
 
 The `/capture` endpoint redirected to `/data/13` — a numbered ID referencing a packet 
 capture file. This immediately suggests that other IDs may be accessible.
+
+---
 
 ## Initial Access
 
@@ -106,6 +110,8 @@ uid=1001(nathan) gid=1001(nathan) groups=1001(nathan)
 
 Retrieved the user flag.
 
+---
+
 ## Privilege Escalation
 
 ### Linux Capabilities — cap_setuid on Python3.8
@@ -144,6 +150,8 @@ cd /root
 cat root.txt
 ```
 
+---
+
 ## Detection
 
 ### What to Look For
@@ -167,6 +175,8 @@ index=web_logs uri_path="/data/*"
 > Note: Field name may vary by log source. Common alternatives include `cs_uri_stem` 
 > (IIS) or `request` (Nginx).
 
+---
+
 ## Key Takeaways
 
 - IDOR is a simple but devastating vulnerability — any endpoint that uses a predictable 
@@ -179,6 +189,8 @@ the same segment can trivially extract credentials. SFTP or SCP should be used i
 Python effectively grants root access to anyone who can execute it. Capabilities should 
 be audited regularly using `getcap -r / 2>/dev/null` and removed unless explicitly required
 
+---
+
 ## Tools Used
 
 - Nmap
@@ -186,6 +198,8 @@ be audited regularly using `getcap -r / 2>/dev/null` and removed unless explicit
 - Wireshark
 - LinPEAS
 - FTP and SSH clients
+
+---
 
 ## References
 
