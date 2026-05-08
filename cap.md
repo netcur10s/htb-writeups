@@ -48,7 +48,7 @@ Name: anonymous
 
 SSH accepts password authentication, worth noting for later once credentials are obtained.
 
-### Web Application — Gobuster
+### Gobuster
 
 ```bash
 gobuster dir -w cap.htb -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
